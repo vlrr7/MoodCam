@@ -1,0 +1,22 @@
+# Node & build
+node_modules/
+dist/
+.env
+.env.local
+*.log
+*.lock
+
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+
+
+# Test coverage
+coverage/
+
+
+# OS / misc
+Thumbs.db
+*.swp
