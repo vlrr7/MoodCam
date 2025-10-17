@@ -1,1 +1,1 @@
-jupyter nbconvert --to script python.ipynb
+jupyter nbconvert --to script model_training.ipynb
