@@ -12,7 +12,6 @@ export default function Controls({ onStart, onStop, onScreenshot }: {
     threshold, setThreshold,
     smoothing, setSmoothing,
     effects, setEffects,
-    modelSource, setModelSource,
     showFaceBox, setShowFaceBox
   } = useStore()
   const [showSettings, setShowSettings] = useState(false)
@@ -235,25 +234,7 @@ export default function Controls({ onStart, onStop, onScreenshot }: {
             </div>
           </div>
 
-          {/* Model Settings */}
-          <div className="space-y-4">
-            <h5 className="text-md font-medium text-neutral-800 dark:text-neutral-200">Model Settings</h5>
-            
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                Model Source
-              </label>
-              <select 
-                value={modelSource} 
-                onChange={e => setModelSource(e.target.value as any)} 
-                className="w-full px-3 py-2 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="mock">Mock Model (Demo)</option>
-                <option value="local">Local WASM</option>
-                <option value="remote">Remote API</option>
-              </select>
-            </div>
-          </div>
+          {/* Model Settings removed (always using Remote API) */}
 
           {/* Status Summary */}
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">

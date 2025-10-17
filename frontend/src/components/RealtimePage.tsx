@@ -9,7 +9,6 @@ import EmotionEffects from './EmotionEffects'
 import { useCamera } from '../hooks/useCamera'
 import { useStore } from '../state/useStore'
 import type { Detection, ModelAdapter } from '../adapters/ModelAdapter'
-import { MockModelAdapter } from '../adapters/MockModelAdapter'
 import RealModelAdapter from '../adapters/RealModelAdapter'
 
 const HistoryPanel = React.lazy(() => import('./HistoryPanel'))
@@ -25,25 +24,16 @@ export default function RealtimePage() {
     running,
     setRunning,
     threshold,
-    modelSource,
   } = useStore()
 
   const [adapter, setAdapter] = React.useState<ModelAdapter | null>(null)
   const [faceBox, setFaceBox] = React.useState<Detection['bbox']>()
   const [latest, setLatest] = React.useState<Detection | null>(null)
 
-  // Choose adapter based on source
+  // Always use remote backend model
   React.useEffect(() => {
-    if (modelSource === 'remote') {
-      setAdapter(new RealModelAdapter('http://localhost:8000'))
-    } else if (modelSource === 'local') {
-      // For now, use mock for local WASM (can be implemented later)
-      setAdapter(new MockModelAdapter())
-    } else {
-      // Mock model for demo
-      setAdapter(new MockModelAdapter())
-    }
-  }, [modelSource])
+    setAdapter(new RealModelAdapter('http://localhost:8000'))
+  }, [])
 
   // Wire adapter events
   React.useEffect(() => {

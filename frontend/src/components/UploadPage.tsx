@@ -4,31 +4,20 @@ import Header from './Header'
 import ImageUpload from './ImageUpload'
 import EmotionBadge from './EmotionBadge'
 import type { Detection, ModelAdapter } from '../adapters/ModelAdapter'
-import { MockModelAdapter } from '../adapters/MockModelAdapter'
 import RealModelAdapter from '../adapters/RealModelAdapter'
-import { useStore } from '../state/useStore'
 
 const HistoryPanel = React.lazy(() => import('./HistoryPanel'))
 
 export default function UploadPage() {
   const navigate = useNavigate()
-  const { modelSource } = useStore()
   const [adapter, setAdapter] = React.useState<ModelAdapter | null>(null)
   const [latest, setLatest] = React.useState<Detection | null>(null)
   const [detections, setDetections] = useState<Detection[]>([])
 
-  // Initialize adapter based on model source
+  // Always use remote backend model
   React.useEffect(() => {
-    if (modelSource === 'remote') {
-      setAdapter(new RealModelAdapter('http://localhost:8000'))
-    } else if (modelSource === 'local') {
-      // For now, use mock for local WASM (can be implemented later)
-      setAdapter(new MockModelAdapter())
-    } else {
-      // Mock model for demo
-      setAdapter(new MockModelAdapter())
-    }
-  }, [modelSource])
+    setAdapter(new RealModelAdapter('http://localhost:8000'))
+  }, [])
 
   const handleImageDetection = (detection: Detection) => {
     setLatest(detection)

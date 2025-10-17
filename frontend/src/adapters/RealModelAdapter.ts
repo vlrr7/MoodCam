@@ -1,9 +1,9 @@
-import type { Detection, Emotion, ModelAdapter } from './ModelAdapter'
+import type { Detection, Emotion, ModelAdapter, ModelStatus } from './ModelAdapter'
 
 export default class RealModelAdapter implements ModelAdapter {
   private baseUrl: string
   private clientId: string
-  private statusCallbacks: ((status: string) => void)[] = []
+  private statusCallbacks: ((status: ModelStatus) => void)[] = []
   private detectionCallbacks: ((detection: Detection) => void)[] = []
   private isLoaded = false
   private isRunning = false
@@ -16,7 +16,7 @@ export default class RealModelAdapter implements ModelAdapter {
     this.clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
-  onStatus(callback: (status: string) => void): void {
+  onStatus(callback: (status: ModelStatus) => void): void {
     this.statusCallbacks.push(callback)
   }
 
@@ -46,14 +46,15 @@ export default class RealModelAdapter implements ModelAdapter {
     }
   }
 
-  async start(stream: MediaStream): Promise<void> {
+  start(stream: MediaStream): void {
     if (!this.isLoaded) {
       throw new Error('Model not loaded')
     }
 
     this.stream = stream
     this.isRunning = true
-    this.notifyStatus('running')
+    // Keep status as 'ready' per ModelStatus type; UI reflects running via separate state
+    this.notifyStatus('ready')
 
     // Create video element for processing
     this.videoElement = document.createElement('video')
@@ -155,7 +156,7 @@ export default class RealModelAdapter implements ModelAdapter {
     return this.processImage(base64Image)
   }
 
-  private notifyStatus(status: string): void {
+  private notifyStatus(status: ModelStatus): void {
     this.statusCallbacks.forEach(callback => callback(status))
   }
 
