@@ -1,6 +1,7 @@
 import os
 import json
 from typing import Tuple, Optional, List, Literal, Any, Dict
+import logging
 
 import numpy as np
 import cv2
@@ -54,13 +55,16 @@ def load_model(model_path: Optional[str] = None) -> Dict[str, Any]:
     """
     base_dir = os.path.dirname(__file__)
     if model_path is None:
-        # Prefer a .pt model if present, else fallback to .h5
-        pt_path = os.path.join(base_dir, 'moodcam_best.pt')
+        # Preference order: Keras .keras -> Keras .h5 -> Ultralytics/TorchScript .pt
+        keras_path = os.path.join(base_dir, 'fine_tuned_model.keras')
         h5_path = os.path.join(base_dir, 'model.h5')
-        if os.path.exists(pt_path):
-            model_path = pt_path
-        else:
+        pt_path = os.path.join(base_dir, 'moodcam_best.pt')
+        if os.path.exists(keras_path):
+            model_path = keras_path
+        elif os.path.exists(h5_path):
             model_path = h5_path
+        else:
+            model_path = pt_path
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(
@@ -68,6 +72,17 @@ def load_model(model_path: Optional[str] = None) -> Dict[str, Any]:
         )
 
     ext = os.path.splitext(model_path)[1].lower()
+
+    # Keras SavedModel/Native (.keras)
+    if ext == '.keras':
+        if keras_load_model is None:
+            raise RuntimeError("TensorFlow/Keras not installed. Install with `pip install tensorflow`. ")
+        model = keras_load_model(model_path)
+        try:
+            load_class_names()
+        except Exception:
+            pass
+        return {'kind': 'keras', 'model': model}
 
     # Ultralytics .pt
     if ext == '.pt':
@@ -133,22 +148,64 @@ def load_model(model_path: Optional[str] = None) -> Dict[str, Any]:
     return {'kind': 'keras', 'model': model}
 
 
+def _get_env_flag(name: str, default: bool = False) -> bool:
+    val = os.getenv(name, None)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_preprocess_mode() -> str:
+    # 'unit' -> [0,1] scaling (default)
+    # 'mobilenet' -> scale to [-1,1]
+    mode = os.getenv('PREPROCESS_MODE', 'unit').strip().lower()
+    if mode not in {'unit', 'mobilenet'}:
+        mode = 'unit'
+    return mode
+
+
+def _apply_normalization(x: np.ndarray, mode: str) -> np.ndarray:
+    # x in float32 [0,1], shape (H,W,C)
+    if mode == 'mobilenet':
+        # MobilenetV2/EfficientNet style: [-1,1]
+        return (x - 0.5) * 2.0
+    return x
+
+
 def _preprocess_for_keras(frame_bgr: np.ndarray, model) -> np.ndarray:
     if not hasattr(model, 'input_shape'):
         raise ValueError('Model has no input_shape; cannot infer preprocessing.')
-    _, H, W, C = model.input_shape
-    if C == 1:
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, (W, H), interpolation=cv2.INTER_AREA)
-        x = resized.astype('float32') / 255.0
-        x = np.expand_dims(x, axis=-1)
-    elif C == 3:
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        resized = cv2.resize(rgb, (W, H), interpolation=cv2.INTER_AREA)
-        x = resized.astype('float32') / 255.0
+    
+    input_shape = model.input_shape
+    target_size = (input_shape[2], input_shape[1]) # (width, height)
+
+    # 1. Convert to grayscale
+    gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+
+    # 2. Resize the grayscale image
+    resized_gray = cv2.resize(gray, target_size, interpolation=cv2.INTER_AREA)
+
+    # 3. Prepare the image based on model's expected channels
+    if input_shape[3] == 3:
+        # Stack the single grayscale channel three times for a 3-channel input
+        logging.debug("Model expects 3 channels, stacking grayscale image.")
+        x = np.stack([resized_gray] * 3, axis=-1)
+    elif input_shape[3] == 1:
+        # Use the grayscale image directly, but add the channel dimension
+        logging.debug("Model expects 1 channel, using grayscale image.")
+        x = np.expand_dims(resized_gray, axis=-1)
     else:
-        raise ValueError(f'Unsupported channel count in model.input_shape: C={C}')
+        raise ValueError(f"Unsupported model input shape. Expected 1 or 3 channels, but got {input_shape[3]}")
+
+    # 4. Normalize the image data
+    x = x.astype('float32') / 255.0
+    mode = _get_preprocess_mode()
+    x = _apply_normalization(x, mode)
+    
+    # 5. Add a batch dimension
     x = np.expand_dims(x, axis=0)
+    
+    logging.debug(f"Final preprocessed shape: {x.shape}")
     return x
 
 
@@ -182,7 +239,7 @@ def _detect_face_bbox(frame_bgr: np.ndarray) -> Optional[Tuple[int, int, int, in
         return None
 
 
-def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, float, Optional[Tuple[int, int, int, int]]]:
+def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, float, Optional[Tuple[int, int, int, int]], Optional[np.ndarray]]:
     """Run prediction on a BGR frame and return (label, probability, bbox?).
 
     bbox is (x,y,w,h) in pixels relative to input frame if available.
@@ -191,8 +248,9 @@ def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, f
     model = model_bundle['model']
 
     if kind == 'keras':
-        # Try face crop to help classification models trained on faces
-        bbox = _detect_face_bbox(frame_bgr)
+        # Optional face crop (default on). Disable with FACE_CROP=0 if trained on full frames.
+        use_crop = _get_env_flag('FACE_CROP', True)
+        bbox = _detect_face_bbox(frame_bgr) if use_crop else None
         roi = frame_bgr
         if bbox is not None:
             x0, y0, w0, h0 = bbox
@@ -201,14 +259,22 @@ def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, f
         preds = model.predict(x)
         if isinstance(preds, (list, tuple)):
             preds = preds[0]
-        preds = np.array(preds).squeeze()
+        preds = np.array(preds).squeeze().astype('float32')
         if preds.ndim != 1:
             raise ValueError(f'Unexpected prediction shape: {preds.shape}')
-        idx = int(np.argmax(preds))
-        prob = float(preds[idx])
+        # If outputs are not a proper probability distribution, apply softmax
+        probs = preds
+        if (probs.min() < 0.0) or (probs.max() > 1.0) or (abs(float(probs.sum()) - 1.0) > 0.05):
+            exp = np.exp(probs - np.max(probs))
+            denom = float(np.sum(exp)) or 1.0
+            probs = exp / denom
+        idx = int(np.argmax(probs))
+        prob = float(probs[idx])
+        # Clamp to [0,1] just in case
+        prob = max(0.0, min(1.0, prob))
         classes = CLASS_NAMES or []
         label = classes[idx] if idx < len(classes) else str(idx)
-        return label, prob, bbox
+        return label, prob, bbox, probs
 
     if kind == 'ultralytics':
         # Convert BGR to RGB; Ultralytics handles resizing/normalization internally
@@ -233,7 +299,7 @@ def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, f
                 label = classes[idx] if idx < len(classes) else str(idx)
             # Try to also provide a face bbox from classical detector
             bbox = _detect_face_bbox(frame_bgr)
-            return label, prob, bbox
+            return label, prob, bbox, None
 
         # Detection path: take highest-confidence box
         boxes = getattr(r0, 'boxes', None)
@@ -263,7 +329,7 @@ def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, f
         if label is None:
             classes = CLASS_NAMES or []
             label = classes[idx] if idx < len(classes) else str(idx)
-        return label, prob, (x, y, w, h)
+    return label, prob, (x, y, w, h), None
 
     if kind == 'torchscript':
         # Face crop to improve classification odds when model expects a face crop
@@ -290,6 +356,6 @@ def predict(frame_bgr: np.ndarray, model_bundle: Dict[str, Any]) -> Tuple[str, f
         prob = float(probs[idx])
         classes = CLASS_NAMES or []
         label = classes[idx] if idx < len(classes) else str(idx)
-        return label, prob, bbox
+    return label, prob, bbox, probs
 
     raise ValueError(f'Unsupported model kind: {kind}')

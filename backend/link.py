@@ -49,10 +49,13 @@ def predict_base64():
         return jsonify({'error': f'Error decoding image: {str(e)}'}), 400
 
     try:
-        label, prob, bbox = model_ml.predict(frame, model_object)
+        label, prob, bbox, probs = model_ml.predict(frame, model_object)
         resp = {'label': label, 'probability': float(prob), 'face_found': bool(bbox is not None)}
         if bbox is not None:
             resp['bbox'] = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])]
+        # Optional debug: include full probability vector when ?debug=1
+        if request.args.get('debug') in ('1', 'true', 'yes') and probs is not None:
+            resp['probs'] = [float(x) for x in probs.tolist()]
         return jsonify(resp)
     except Exception as e:
         logger.exception("Prediction error: %s", e)
