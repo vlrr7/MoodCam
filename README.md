@@ -55,35 +55,35 @@ MoodCam follows a modern full-stack architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Frontend (React)                        │
-│  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐  │
-│  │  Landing   │  │  Realtime  │  │  Upload              │  │
-│  │  Page      │  │  Detection │  │  Analysis            │  │
-│  └────────────┘  └────────────┘  └──────────────────────┘  │
-│         │                │                   │               │
-│         └────────────────┴───────────────────┘               │
-│                          │                                   │
-│                  ┌───────▼────────┐                          │
-│                  │ Model Adapter  │                          │
-│                  │  (HTTP Client) │                          │
-│                  └───────┬────────┘                          │
-└──────────────────────────┼───────────────────────────────────┘
+│                      Frontend (React)                       │
+│  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐   │
+│  │  Landing   │  │  Realtime  │  │  Upload              │   │
+│  │  Page      │  │  Detection │  │  Analysis            │   │
+│  └────────────┘  └────────────┘  └──────────────────────┘   │
+│         │                │                   │              │
+│         └────────────────┴───────────────────┘              │
+│                          │                                  │
+│                  ┌───────▼────────┐                         │
+│                  │ Model Adapter  │                         │
+│                  │  (HTTP Client) │                         │
+│                  └───────┬────────┘                         │
+└──────────────────────────┼──────────────────────────────────┘
                            │ REST API (JSON)
-┌──────────────────────────▼───────────────────────────────────┐
-│                    Backend (Flask)                            │
-│  ┌────────────┐  ┌──────────────┐  ┌───────────────────┐   │
-│  │   Flask    │  │   Model.py   │  │ Class Names JSON  │   │
-│  │   Server   │  │  (ML Logic)  │  │   (7 emotions)    │   │
-│  └─────┬──────┘  └──────┬───────┘  └─────────┬─────────┘   │
-│        │                │                      │             │
-│        └────────────────┴──────────────────────┘             │
-│                          │                                   │
-│                ┌─────────▼─────────┐                         │
-│                │  TensorFlow/Keras │                         │
-│                │   Trained Model   │                         │
-│                │ (fine_tuned.keras)│                         │
-│                └───────────────────┘                         │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────▼──────────────────────────────────┐
+│                    Backend (Flask)                          │
+│  ┌────────────┐  ┌──────────────┐  ┌───────────────────┐    │
+│  │   Flask    │  │   Model.py   │  │ Class Names JSON  │    │
+│  │   Server   │  │  (ML Logic)  │  │   (7 emotions)    │    │
+│  └─────┬──────┘  └──────┬───────┘  └─────────┬─────────┘    │
+│        │                │                    │              │
+│        └────────────────┴────────────────────┘              │
+│                         │                                   │
+│               ┌─────────▼─────────┐                         │
+│               │  TensorFlow/Keras │                         │
+│               │   Trained Model   │                         │
+│               │ (fine_tuned.keras)│                         │
+│               └───────────────────┘                         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## 🛠️ Technology Stack
@@ -357,41 +357,6 @@ cd backend
 jupyter notebook model_training.ipynb
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. **Fork the Repository**: Click the "Fork" button on GitHub
-2. **Create a Branch**: `git checkout -b feature/your-feature-name`
-3. **Make Changes**: Implement your feature or bug fix
-4. **Test Thoroughly**: Ensure all tests pass and add new tests if needed
-5. **Commit**: `git commit -m "Add: your feature description"`
-6. **Push**: `git push origin feature/your-feature-name`
-7. **Open a Pull Request**: Submit your changes for review
-
-### Coding Standards
-
-- **Python**: Follow PEP 8 guidelines
-- **TypeScript/React**: Use ESLint configuration provided
-- **Commits**: Write clear, descriptive commit messages
-- **Documentation**: Update README for significant changes
-
-## 🐛 Known Issues & Limitations
-
-- **Browser Support**: Requires modern browsers with WebRTC support for camera access
-- **Performance**: Real-time detection frame rate depends on device capabilities
-- **Lighting**: Model performance may vary with extreme lighting conditions
-- **Face Angle**: Works best with frontal face views
-- **Model Size**: 25MB model may take time to load on slower connections
-
-## 📝 License
-
-This project is available for educational and research purposes. Please check with the repository owner for commercial use licensing.
-
-## 👨‍💻 Authors
-
-- **Anis Benabdallah** - Initial development and model training
-
 ## 🙏 Acknowledgments
 
 - TensorFlow and Keras teams for the deep learning framework
@@ -407,11 +372,3 @@ For questions, issues, or suggestions:
 - **Repository**: [github.com/vlrr7/MoodCam](https://github.com/vlrr7/MoodCam)
 
 ---
-
-<div align="center">
-
-**Built with ❤️ using TensorFlow, React, and TypeScript**
-
-⭐ Star this repository if you find it helpful!
-
-</div>
